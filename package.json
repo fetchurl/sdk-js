@@ -1,0 +1,28 @@
+{
+  "name": "fetchurl-sdk",
+  "version": "0.1.0",
+  "description": "Protocol-level client SDK for fetchurl content-addressable cache servers",
+  "type": "module",
+  "exports": "./fetchurl.js",
+  "files": [
+    "fetchurl.js",
+    "README.md"
+  ],
+  "keywords": [
+    "fetchurl",
+    "cache",
+    "content-addressable",
+    "hash",
+    "sha256"
+  ],
+  "license": "MIT",
+  "author": "lucasew",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fetchurl/sdk-js.git"
+  },
+  "homepage": "https://github.com/fetchurl/sdk-js",
+  "devDependencies": {
+    "testcontainers": "^10.6.0"
+  }
+}
