@@ -1,6 +1,6 @@
 {
   "name": "fetchurl-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Protocol-level client SDK for fetchurl content-addressable cache servers",
   "type": "module",
   "exports": "./fetchurl.js",
@@ -21,7 +21,7 @@
     "type": "git",
     "url": "git+https://github.com/fetchurl/sdk-js.git"
   },
-  "homepage": "https://github.com/fetchurl/sdk-js",
+  "homepage": "https://www.npmjs.com/package/fetchurl-sdk",
   "devDependencies": {
     "testcontainers": "^10.6.0"
   }
