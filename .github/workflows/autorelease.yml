@@ -21,7 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
-          # svu needs full history + tags
           fetch-depth: 0
 
       - name: Setup git config
@@ -44,27 +43,17 @@ jobs:
         run: node --test fetchurl.integration.test.js
         continue-on-error: true
 
-      - name: Bump version (svu)
+      # Local commit + tag only (nothing pushed yet)
+      - name: Prepare release (svu, commit, local tag)
         if: github.event_name == 'workflow_dispatch'
-        id: bump
+        id: prep
         env:
           NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          VERSION="$(NO_TAG=1 ./make_release "$NEW_VERSION")"
+          VERSION="$(./make_release prepare "$NEW_VERSION")"
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "New version: $VERSION (from svu $NEW_VERSION)" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Create GitHub release
-        if: env.RELEASE_VERSION != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ env.RELEASE_VERSION }}
-        run: |
-          git tag "$TAG"
-          git push origin "$TAG"
-          git push origin HEAD:main
-          gh release create "$TAG" --title "Release $TAG" --generate-notes
+          echo "Prepared $VERSION (not pushed until publish succeeds)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish to npm
         if: env.RELEASE_VERSION != ''
@@ -73,3 +62,10 @@ jobs:
         run: |
           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
           npm publish --access public
+
+      # Push commit/tag/GH release only after successful publish
+      - name: Push commit, tag, and GitHub release
+        if: env.RELEASE_VERSION != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./make_release push "$RELEASE_VERSION"
