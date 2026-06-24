@@ -1,6 +1,6 @@
 {
   "name": "fetchurl-sdk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Protocol-level client SDK for fetchurl content-addressable cache servers",
   "type": "module",
   "exports": "./fetchurl.js",
