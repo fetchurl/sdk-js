@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Usage: ./make_release [next|major|minor|patch|<x.y.z>]
+# Prints only the bare semver on stdout (last line). Progress on stderr.
 MODE="${1:-next}"
 
 case "$MODE" in
@@ -15,18 +16,18 @@ esac
 VERSION="${VERSION#v}"
 
 node -e "
-const fs = require('fs');
-const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const fs = require(\"fs\");
+const p = JSON.parse(fs.readFileSync(\"package.json\", \"utf8\"));
 p.version = process.argv[1];
-fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+fs.writeFileSync(\"package.json\", JSON.stringify(p, null, 2) + \"\\n\");
 " "$VERSION"
-
 git add package.json
-git commit -sm "bump to $VERSION" || true
+
+git commit -sm "bump to $VERSION" 1>&2 || true
 if [[ ! -v NO_TAG ]]; then
   git tag "$VERSION"
-  git push origin "$VERSION"
+  git push origin "$VERSION" 1>&2
 fi
-git push origin HEAD
+git push origin HEAD 1>&2
 
-echo "$VERSION"
+printf '%s\n' "$VERSION"
