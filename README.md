@@ -50,12 +50,3 @@ npm test
 # Integration tests (needs Docker + fetchurl image):
 # FETCHURL_TEST_IMAGE=fetchurl:local node --test fetchurl.integration.test.js
 ```
-
-## Related
-
-| Repo | Role |
-|------|------|
-| [fetchurl/spec](https://github.com/fetchurl/spec) | Protocol |
-| [fetchurl/fetchurl](https://github.com/fetchurl/fetchurl) | Go server |
-| [fetchurl/sdk-python](https://github.com/fetchurl/sdk-python) | Python SDK |
-| [fetchurl/sdk-rust](https://github.com/fetchurl/sdk-rust) | Rust SDK |
