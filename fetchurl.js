@@ -237,9 +237,10 @@ export async function hashData(algo, data) {
  * @throws {HashMismatchError}
  */
 export async function verifyHash(algo, expectedHash, data) {
+  const expected = String(expectedHash).toLowerCase();
   const actual = await hashData(algo, data);
-  if (actual !== expectedHash) {
-    throw new HashMismatchError(expectedHash, actual);
+  if (actual !== expected) {
+    throw new HashMismatchError(expected, actual);
   }
 }
 
@@ -291,7 +292,8 @@ export class FetchSession {
     if (!isSupported(this.#algo)) {
       throw new UnsupportedAlgorithmError(this.#algo);
     }
-    this.#hash = hash;
+    // Spec: hashes MUST be lowercase hex. Normalize so callers with mixed case still work.
+    this.#hash = String(hash).toLowerCase();
 
     const sourceHeader =
       sourceUrls.length > 0 ? encodeSourceUrls(sourceUrls) : null;
