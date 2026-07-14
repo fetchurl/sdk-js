@@ -394,10 +394,13 @@ export async function fetchurl({
     const chunks = [];
     let bytesRead = 0;
     try {
-      for await (const chunk of resp.body) {
-        hasher.update(chunk);
-        chunks.push(new Uint8Array(chunk));
-        bytesRead += chunk.byteLength;
+      // fetch may return null body (e.g. some 204/empty responses). Treat as empty stream.
+      if (resp.body) {
+        for await (const chunk of resp.body) {
+          hasher.update(chunk);
+          chunks.push(new Uint8Array(chunk));
+          bytesRead += chunk.byteLength;
+        }
       }
       const actualHash = await hasher.finish();
       if (actualHash !== session.hash) {
