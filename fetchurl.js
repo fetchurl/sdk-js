@@ -295,15 +295,16 @@ export class FetchSession {
     // Spec: hashes MUST be lowercase hex. Normalize so callers with mixed case still work.
     this.#hash = String(hash).toLowerCase();
 
-    const sourceHeader =
-      sourceUrls.length > 0 ? encodeSourceUrls(sourceUrls) : null;
+    // sourceUrls is non-empty (validated above); always send X-Source-Urls on server attempts.
+    const sourceHeader = encodeSourceUrls(sourceUrls);
 
     for (const server of servers) {
       const base = server.replace(/\/+$/, '');
       const url = `${base}/${this.#algo}/${this.#hash}`;
-      const headers = {};
-      if (sourceHeader) headers['X-Source-Urls'] = sourceHeader;
-      this.#attempts.push({ url, headers });
+      this.#attempts.push({
+        url,
+        headers: { 'X-Source-Urls': sourceHeader },
+      });
     }
 
     const shuffled = [...sourceUrls];

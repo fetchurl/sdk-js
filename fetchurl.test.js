@@ -78,6 +78,17 @@ describe('SFV', () => {
     );
   });
 
+  it('escapes quotes and backslashes in URLs', () => {
+    assert.equal(
+      encodeSourceUrls(['https://ex.com/a"b\\c']),
+      '"https://ex.com/a\\"b\\\\c"',
+    );
+    assert.deepEqual(
+      parseFetchurlServer(encodeSourceUrls(['https://ex.com/a"b\\c'])),
+      ['https://ex.com/a"b\\c'],
+    );
+  });
+
   it('parses string list', () => {
     assert.deepEqual(
       parseFetchurlServer('"https://a.com", "https://b.com"'),
