@@ -1,23 +1,25 @@
 import { describe, it } from 'node:test';
 import { Buffer } from 'node:buffer';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { GenericContainer, Network, Wait } from 'testcontainers';
 import { fetchurl, hashData } from './fetchurl.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 describe('fetchurl integration (testcontainers)', { timeout: 120_000 }, () => {
   it('fetches through fetchurl server from a source URL', async () => {
+    const imageRef = process.env.FETCHURL_TEST_IMAGE;
+    if (!imageRef) {
+      // This repo has no Dockerfile; the reference server image is external
+      // (same contract as fetchurl/sdk-python). CI only runs this when the var is set.
+      throw new Error(
+        'FETCHURL_TEST_IMAGE is required for integration tests (e.g. fetchurl:local)',
+      );
+    }
+
     const content = Buffer.from('integration-test');
     const hash = await hashData('sha256', content);
 
-    const repoRoot = path.resolve(__dirname, '..', '..');
     const network = await new Network().start();
 
-    const imageRef = process.env.FETCHURL_TEST_IMAGE;
     let container;
     const oldEnv = process.env.FETCHURL_SERVER;
     let upstream;
@@ -42,24 +44,13 @@ describe('fetchurl integration (testcontainers)', { timeout: 120_000 }, () => {
         .withWaitStrategy(Wait.forHttp('/file', 8000))
         .start();
 
-      if (imageRef) {
-        container = await new GenericContainer(imageRef)
-          .withCommand(['server'])
-          .withNetwork(network)
-          .withExposedPorts(8080)
-          .withEnvironment({ FETCHURL_ALLOW_PRIVATE_IPS: '1' })
-          .withWaitStrategy(Wait.forLogMessage(/Starting server/i))
-          .start();
-      } else {
-        const image = await GenericContainer.fromDockerfile(repoRoot).build();
-        container = await image
-          .withCommand(['server'])
-          .withNetwork(network)
-          .withExposedPorts(8080)
-          .withEnvironment({ FETCHURL_ALLOW_PRIVATE_IPS: '1' })
-          .withWaitStrategy(Wait.forLogMessage(/Starting server/i))
-          .start();
-      }
+      container = await new GenericContainer(imageRef)
+        .withCommand(['server'])
+        .withNetwork(network)
+        .withExposedPorts(8080)
+        .withEnvironment({ FETCHURL_ALLOW_PRIVATE_IPS: '1' })
+        .withWaitStrategy(Wait.forLogMessage(/Starting server/i))
+        .start();
 
       const host = container.getHost();
       const port = container.getMappedPort(8080);
@@ -77,7 +68,8 @@ describe('fetchurl integration (testcontainers)', { timeout: 120_000 }, () => {
 
       assert.deepEqual(data, new Uint8Array(content));
     } finally {
-      process.env.FETCHURL_SERVER = oldEnv;
+      if (oldEnv === undefined) delete process.env.FETCHURL_SERVER;
+      else process.env.FETCHURL_SERVER = oldEnv;
       if (container) await container.stop();
       if (upstream) await upstream.stop();
       await network.stop();
