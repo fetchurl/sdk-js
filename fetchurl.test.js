@@ -276,6 +276,25 @@ describe('fetchurl()', () => {
     }
   });
 
+  it('accepts empty content when body is null', async () => {
+    const content = new Uint8Array(0);
+    const hash = await sha256hex(content);
+    const emptyBodyFetch = async () => ({
+      ok: true,
+      status: 200,
+      body: null,
+    });
+    await withEnv('', async () => {
+      const data = await fetchurl({
+        fetch: emptyBodyFetch,
+        algo: 'sha256',
+        hash,
+        sourceUrls: ['http://example.test/empty'],
+      });
+      assert.deepEqual(data, content);
+    });
+  });
+
   it('falls back from failed server to direct source', async () => {
     const content = new TextEncoder().encode('fallback content');
     const hash = await sha256hex(content);
