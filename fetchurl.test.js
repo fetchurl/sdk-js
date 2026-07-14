@@ -125,6 +125,12 @@ describe('hashData / verifyHash', () => {
       HashMismatchError,
     );
   });
+
+  it('verifyHash accepts uppercase expected hex', async () => {
+    const data = new TextEncoder().encode('hello world');
+    const hash = await sha256hex(data);
+    await verifyHash('sha256', hash.toUpperCase(), data);
+  });
 });
 
 describe('FetchSession', () => {
@@ -195,6 +201,19 @@ describe('FetchSession', () => {
       assert.ok(!session.succeeded());
       assert.equal(session.nextAttempt(), null);
     });
+  });
+
+  it('normalizes expected hash to lowercase in URLs', async () => {
+    const hash = await sha256hex(new TextEncoder().encode('test'));
+    const session = new FetchSession({
+      servers: ['http://cache/api/fetchurl'],
+      algo: 'sha256',
+      hash: hash.toUpperCase(),
+      sourceUrls: ['http://src'],
+    });
+    assert.equal(session.hash, hash);
+    const attempt = session.nextAttempt();
+    assert.ok(attempt.url.endsWith(`/${hash}`));
   });
 });
 
