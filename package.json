@@ -8,6 +8,13 @@
     "fetchurl.js",
     "README.md"
   ],
+  "scripts": {
+    "test": "node --test fetchurl.test.js",
+    "test:integration": "node --test fetchurl.integration.test.js"
+  },
+  "engines": {
+    "node": ">=19"
+  },
   "keywords": [
     "fetchurl",
     "cache",
