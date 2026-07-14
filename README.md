@@ -48,5 +48,5 @@ Clients **must** treat the server as untrusted and verify the hash (this SDK doe
 npm install
 npm test
 # Integration tests (needs Docker + fetchurl image):
-# FETCHURL_TEST_IMAGE=fetchurl:local node --test fetchurl.integration.test.js
+# FETCHURL_TEST_IMAGE=fetchurl:local npm run test:integration
 ```
