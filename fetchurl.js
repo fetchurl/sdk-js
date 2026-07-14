@@ -300,7 +300,7 @@ export class FetchSession {
 
     for (const server of servers) {
       const base = server.replace(/\/+$/, '');
-      const url = `${base}/${this.#algo}/${hash}`;
+      const url = `${base}/${this.#algo}/${this.#hash}`;
       const headers = {};
       if (sourceHeader) headers['X-Source-Urls'] = sourceHeader;
       this.#attempts.push({ url, headers });
