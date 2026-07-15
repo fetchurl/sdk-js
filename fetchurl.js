@@ -288,6 +288,10 @@ export class FetchSession {
       throw new MissingSourceUrlsError();
     }
 
+    if (hash == null || !String(hash).trim()) {
+      throw new FetchUrlError('hash is required');
+    }
+
     this.#algo = normalizeAlgo(algo);
     if (!isSupported(this.#algo)) {
       throw new UnsupportedAlgorithmError(this.#algo);

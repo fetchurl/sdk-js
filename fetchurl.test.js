@@ -10,6 +10,7 @@ import {
   verifyHash,
   FetchSession,
   fetchurl,
+  FetchUrlError,
   UnsupportedAlgorithmError,
   MissingSourceUrlsError,
   HashMismatchError,
@@ -149,6 +150,27 @@ describe('FetchSession', () => {
     assert.throws(
       () => new FetchSession({ algo: 'sha256', hash: 'abc', sourceUrls: [] }),
       MissingSourceUrlsError,
+    );
+  });
+
+  it('rejects empty hash', () => {
+    assert.throws(
+      () => new FetchSession({ algo: 'sha256', hash: '', sourceUrls: ['http://src'] }),
+      (err) => err instanceof FetchUrlError && /hash is required/.test(err.message),
+    );
+  });
+
+  it('rejects blank hash', () => {
+    assert.throws(
+      () => new FetchSession({ algo: 'sha256', hash: '   ', sourceUrls: ['http://src'] }),
+      (err) => err instanceof FetchUrlError && /hash is required/.test(err.message),
+    );
+  });
+
+  it('rejects null hash', () => {
+    assert.throws(
+      () => new FetchSession({ algo: 'sha256', hash: null, sourceUrls: ['http://src'] }),
+      (err) => err instanceof FetchUrlError && /hash is required/.test(err.message),
     );
   });
 
