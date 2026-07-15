@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
   normalizeAlgo,
   isSupported,
+  expectedHexLength,
+  normalizeContentHash,
   encodeSourceUrls,
   parseFetchurlServer,
   hashData,
@@ -71,6 +73,52 @@ describe('isSupported', () => {
   });
 });
 
+describe('expectedHexLength / normalizeContentHash', () => {
+  it('returns digest hex lengths', () => {
+    assert.equal(expectedHexLength('sha1'), 40);
+    assert.equal(expectedHexLength('sha256'), 64);
+    assert.equal(expectedHexLength('sha512'), 128);
+    assert.equal(expectedHexLength('SHA-256'), 64);
+  });
+
+  it('rejects unsupported algo for length', () => {
+    assert.throws(() => expectedHexLength('md5'), UnsupportedAlgorithmError);
+  });
+
+  it('lowercases valid hex', () => {
+    const upper =
+      'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855';
+    assert.equal(normalizeContentHash('sha256', upper), upper.toLowerCase());
+  });
+
+  it('rejects wrong length', () => {
+    assert.throws(
+      () => normalizeContentHash('sha256', 'abcd'),
+      (err) => err instanceof FetchUrlError && /hex characters/.test(err.message),
+    );
+  });
+
+  it('rejects non-hex', () => {
+    const almost =
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85g';
+    assert.throws(
+      () => normalizeContentHash('sha256', almost),
+      (err) => err instanceof FetchUrlError && /hexadecimal/.test(err.message),
+    );
+  });
+
+  it('rejects blank and null', () => {
+    assert.throws(
+      () => normalizeContentHash('sha256', '  '),
+      (err) => err instanceof FetchUrlError && /hash is required/.test(err.message),
+    );
+    assert.throws(
+      () => normalizeContentHash('sha256', null),
+      (err) => err instanceof FetchUrlError && /hash is required/.test(err.message),
+    );
+  });
+});
+
 describe('SFV', () => {
   it('encodes string list', () => {
     assert.equal(
@@ -132,8 +180,9 @@ describe('hashData / verifyHash', () => {
 
   it('verifyHash throws on mismatch', async () => {
     const data = new TextEncoder().encode('hello world');
+    const wrong = await sha256hex(new TextEncoder().encode('other'));
     await assert.rejects(
-      () => verifyHash('sha256', 'badhash', data),
+      () => verifyHash('sha256', wrong, data),
       HashMismatchError,
     );
   });
@@ -142,6 +191,24 @@ describe('hashData / verifyHash', () => {
     const data = new TextEncoder().encode('hello world');
     const hash = await sha256hex(data);
     await verifyHash('sha256', hash.toUpperCase(), data);
+  });
+
+  it('verifyHash rejects non-hex expected', async () => {
+    const data = new TextEncoder().encode('hello world');
+    const bad =
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85g';
+    await assert.rejects(
+      () => verifyHash('sha256', bad, data),
+      (err) => err instanceof FetchUrlError && /hexadecimal/.test(err.message),
+    );
+  });
+
+  it('verifyHash rejects wrong-length expected', async () => {
+    const data = new TextEncoder().encode('hello world');
+    await assert.rejects(
+      () => verifyHash('sha256', 'abcd', data),
+      (err) => err instanceof FetchUrlError && /hex characters/.test(err.message),
+    );
   });
 });
 
@@ -171,6 +238,25 @@ describe('FetchSession', () => {
     assert.throws(
       () => new FetchSession({ algo: 'sha256', hash: null, sourceUrls: ['http://src'] }),
       (err) => err instanceof FetchUrlError && /hash is required/.test(err.message),
+    );
+  });
+
+  it('rejects non-hex hash', () => {
+    assert.throws(
+      () =>
+        new FetchSession({
+          algo: 'sha256',
+          hash: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+          sourceUrls: ['http://src'],
+        }),
+      (err) => err instanceof FetchUrlError && /hexadecimal/.test(err.message),
+    );
+  });
+
+  it('rejects wrong-length hash', () => {
+    assert.throws(
+      () => new FetchSession({ algo: 'sha256', hash: 'abcd', sourceUrls: ['http://src'] }),
+      (err) => err instanceof FetchUrlError && /hex characters/.test(err.message),
     );
   });
 

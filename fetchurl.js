@@ -79,6 +79,13 @@ const WEBCRYPTO_ALGOS = {
   sha512: 'SHA-512',
 };
 
+/** Full digest length in hex characters for each supported algorithm. */
+const DIGEST_HEX_LEN = {
+  sha1: 40,
+  sha256: 64,
+  sha512: 128,
+};
+
 /**
  * Normalize algorithm name per spec: lowercase, only [a-z0-9].
  * @param {string} name
@@ -95,6 +102,54 @@ export function normalizeAlgo(name) {
  */
 export function isSupported(algo) {
   return normalizeAlgo(algo) in WEBCRYPTO_ALGOS;
+}
+
+/**
+ * Expected hex length of a full digest for *algo*.
+ * @param {string} algo
+ * @returns {number}
+ * @throws {UnsupportedAlgorithmError}
+ */
+export function expectedHexLength(algo) {
+  const key = normalizeAlgo(algo);
+  if (!(key in DIGEST_HEX_LEN)) {
+    throw new UnsupportedAlgorithmError(key);
+  }
+  return DIGEST_HEX_LEN[key];
+}
+
+/**
+ * Normalize a content hash per the fetchurl spec: full-length lowercase hex.
+ *
+ * Rejects null, blank, non-hex, and wrong-length values before any network I/O.
+ * Mixed-case hex is accepted and returned lowercased.
+ *
+ * @param {string} algo - Hash algorithm (normalized or not).
+ * @param {string | null | undefined} hash
+ * @returns {string} Lowercase hex of the correct length for *algo*.
+ * @throws {FetchUrlError|UnsupportedAlgorithmError}
+ */
+export function normalizeContentHash(algo, hash) {
+  if (hash == null || !String(hash).trim()) {
+    throw new FetchUrlError('hash is required');
+  }
+  const key = normalizeAlgo(algo);
+  const expectedLen = expectedHexLength(key);
+  const lower = String(hash).toLowerCase();
+  if (lower.length !== expectedLen) {
+    throw new FetchUrlError(
+      `hash must be ${expectedLen} hex characters for ${key} (got ${lower.length})`,
+    );
+  }
+  for (let i = 0; i < lower.length; i++) {
+    const c = lower.charCodeAt(i);
+    const isDigit = c >= 48 && c <= 57; // 0-9
+    const isHexLetter = c >= 97 && c <= 102; // a-f
+    if (!isDigit && !isHexLetter) {
+      throw new FetchUrlError('hash must be hexadecimal');
+    }
+  }
+  return lower;
 }
 
 // --- SFV helpers (RFC 8941 string lists) ---
@@ -237,8 +292,8 @@ export async function hashData(algo, data) {
  * @throws {HashMismatchError}
  */
 export async function verifyHash(algo, expectedHash, data) {
-  const expected = String(expectedHash).toLowerCase();
-  const actual = await hashData(algo, data);
+  const expected = normalizeContentHash(algo, expectedHash);
+  const actual = await hashData(normalizeAlgo(algo), data);
   if (actual !== expected) {
     throw new HashMismatchError(expected, actual);
   }
@@ -288,16 +343,12 @@ export class FetchSession {
       throw new MissingSourceUrlsError();
     }
 
-    if (hash == null || !String(hash).trim()) {
-      throw new FetchUrlError('hash is required');
-    }
-
     this.#algo = normalizeAlgo(algo);
     if (!isSupported(this.#algo)) {
       throw new UnsupportedAlgorithmError(this.#algo);
     }
-    // Spec: hashes MUST be lowercase hex. Normalize so callers with mixed case still work.
-    this.#hash = String(hash).toLowerCase();
+    // Spec: hashes MUST be lowercase hex of the full digest. Fail early on garbage.
+    this.#hash = normalizeContentHash(this.#algo, hash);
 
     // sourceUrls is non-empty (validated above); always send X-Source-Urls on server attempts.
     const sourceHeader = encodeSourceUrls(sourceUrls);
