@@ -412,6 +412,27 @@ export class FetchSession {
 // --- High-level fetch ---
 
 /**
+ * Best-effort cancel of a fetch response body stream.
+ *
+ * Undici/fetch keep the connection checked out until the body is cancelled or
+ * fully consumed. Parity with sdk-python `_close_body` / sdk-java `closeQuietly`:
+ * errors from cancel must not override the real fetch outcome or abort fallback.
+ *
+ * @param {ReadableStream | null | undefined} body
+ * @returns {Promise<void>}
+ */
+export async function cancelBody(body) {
+  if (body == null) return;
+  const cancel = body.cancel;
+  if (typeof cancel !== 'function') return;
+  try {
+    await cancel.call(body);
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Fetch and verify a file from fetchurl servers or direct sources.
  *
  * @param {Object} options
@@ -445,6 +466,7 @@ export async function fetchurl({
 
     if (!resp.ok) {
       lastError = new FetchUrlError(`unexpected status ${resp.status}`);
+      await cancelBody(resp.body);
       continue;
     }
 
@@ -477,6 +499,13 @@ export async function fetchurl({
       if (bytesRead > 0) {
         session.reportPartial();
         throw new PartialWriteError(e);
+      }
+    } finally {
+      // Full success returns above (body already consumed). Failed attempts —
+      // including PartialWriteError — still free the body so fallback / the
+      // process can reuse sockets (undici keeps connections until cancel).
+      if (!session.succeeded()) {
+        await cancelBody(resp.body);
       }
     }
   }
