@@ -12,6 +12,7 @@ import {
   verifyHash,
   FetchSession,
   fetchurl,
+  cancelBody,
   FetchUrlError,
   UnsupportedAlgorithmError,
   MissingSourceUrlsError,
@@ -459,5 +460,116 @@ describe('fetchurl()', () => {
       bad.close();
       good.close();
     }
+  });
+});
+
+/** Fake Response body that records cancel() calls. */
+function trackingBody(chunks = []) {
+  const state = { cancelCount: 0 };
+  const body = {
+    async *[Symbol.asyncIterator]() {
+      for (const c of chunks) yield c;
+    },
+    cancel() {
+      state.cancelCount += 1;
+      return Promise.resolve();
+    },
+  };
+  return { body, state };
+}
+
+describe('cancelBody / response cleanup', () => {
+  it('cancelBody is a no-op for null/undefined', async () => {
+    await cancelBody(null);
+    await cancelBody(undefined);
+  });
+
+  it('cancelBody ignores cancel errors', async () => {
+    await cancelBody({
+      cancel() {
+        throw new Error('already locked');
+      },
+    });
+  });
+
+  it('cancels body on success path is not required (fully consumed)', async () => {
+    const content = new TextEncoder().encode('close me');
+    const hash = await sha256hex(content);
+    const { body, state } = trackingBody([content]);
+    const mockFetch = async () => ({ ok: true, status: 200, body });
+    await withEnv('', async () => {
+      const data = await fetchurl({
+        fetch: mockFetch,
+        algo: 'sha256',
+        hash,
+        sourceUrls: ['http://example.test/ok'],
+      });
+      assert.deepEqual(data, content);
+    });
+    // Fully iterated body: cancel in finally is skipped on success.
+    assert.equal(state.cancelCount, 0);
+  });
+
+  it('cancels body on non-200', async () => {
+    const hash = await sha256hex(new TextEncoder().encode('x'));
+    const { body, state } = trackingBody([new TextEncoder().encode('nope')]);
+    const mockFetch = async () => ({ ok: false, status: 404, body });
+    await withEnv('', async () => {
+      await assert.rejects(
+        () =>
+          fetchurl({
+            fetch: mockFetch,
+            algo: 'sha256',
+            hash,
+            sourceUrls: ['http://example.test/missing'],
+          }),
+        AllSourcesFailedError,
+      );
+    });
+    assert.ok(state.cancelCount >= 1);
+  });
+
+  it('cancels body on hash mismatch (partial write)', async () => {
+    const wrong = new TextEncoder().encode('wrong content');
+    const hash = await sha256hex(new TextEncoder().encode('right content'));
+    const { body, state } = trackingBody([wrong]);
+    const mockFetch = async () => ({ ok: true, status: 200, body });
+    await withEnv('', async () => {
+      await assert.rejects(
+        () =>
+          fetchurl({
+            fetch: mockFetch,
+            algo: 'sha256',
+            hash,
+            sourceUrls: ['http://example.test/bad-hash'],
+          }),
+        PartialWriteError,
+      );
+    });
+    assert.ok(state.cancelCount >= 1);
+  });
+
+  it('cancels failed server body then falls back to direct source', async () => {
+    const content = new TextEncoder().encode('fallback after cancel');
+    const hash = await sha256hex(content);
+    const bad = trackingBody([new TextEncoder().encode('err')]);
+    const good = trackingBody([content]);
+    let n = 0;
+    const mockFetch = async () => {
+      n += 1;
+      if (n === 1) return { ok: false, status: 500, body: bad.body };
+      return { ok: true, status: 200, body: good.body };
+    };
+    await withEnv('"http://cache.example/api/fetchurl"', async () => {
+      const data = await fetchurl({
+        fetch: mockFetch,
+        algo: 'sha256',
+        hash,
+        sourceUrls: ['http://example.test/good'],
+      });
+      assert.deepEqual(data, content);
+    });
+    assert.ok(bad.state.cancelCount >= 1);
+    assert.equal(good.state.cancelCount, 0);
   });
 });
