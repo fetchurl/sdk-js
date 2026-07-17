@@ -335,6 +335,58 @@ describe('FetchSession', () => {
     const attempt = session.nextAttempt();
     assert.ok(attempt.url.endsWith(`/${hash}`));
   });
+
+  it('parses a FETCHURL_SERVER-format string for servers (not char-by-char)', async () => {
+    const hash = await sha256hex(new TextEncoder().encode('test'));
+    // Regression: `for…of` on a string yields characters, producing URLs like
+    // "h/sha256/…" instead of a real cache base.
+    const session = new FetchSession({
+      servers: 'http://cache.local:8080/api/fetchurl',
+      algo: 'sha256',
+      hash,
+      sourceUrls: ['http://src'],
+    });
+    const a1 = session.nextAttempt();
+    assert.equal(
+      a1.url,
+      `http://cache.local:8080/api/fetchurl/sha256/${hash}`,
+    );
+    assert.ok(a1.headers['X-Source-Urls']);
+    const a2 = session.nextAttempt();
+    assert.equal(a2.url, 'http://src');
+    assert.equal(session.nextAttempt(), null);
+  });
+
+  it('parses an SFV string list for servers', async () => {
+    const hash = await sha256hex(new TextEncoder().encode('test'));
+    const session = new FetchSession({
+      servers: '"http://cache1/api/fetchurl", "http://cache2/api/fetchurl"',
+      algo: 'sha256',
+      hash,
+      sourceUrls: ['http://src'],
+    });
+    assert.ok(
+      session.nextAttempt().url.startsWith('http://cache1/api/fetchurl/sha256/'),
+    );
+    assert.ok(
+      session.nextAttempt().url.startsWith('http://cache2/api/fetchurl/sha256/'),
+    );
+    assert.equal(session.nextAttempt().url, 'http://src');
+  });
+
+  it('rejects non-array non-string servers', async () => {
+    const hash = await sha256hex(new TextEncoder().encode('test'));
+    assert.throws(
+      () =>
+        new FetchSession({
+          servers: { url: 'http://cache' },
+          algo: 'sha256',
+          hash,
+          sourceUrls: ['http://src'],
+        }),
+      (err) => err instanceof FetchUrlError && /servers must be/.test(err.message),
+    );
+  });
 });
 
 // --- Integration tests ---
