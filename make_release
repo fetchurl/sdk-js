@@ -10,7 +10,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST = ROOT / "package.json"
-MANIFEST_PATHS = [str(MANIFEST.relative_to(ROOT))]
+LOCKFILE = ROOT / "package-lock.json"
+# Keep package.json and the lockfile root version in lockstep on bump.
+MANIFEST_PATHS = [
+    str(MANIFEST.relative_to(ROOT)),
+    str(LOCKFILE.relative_to(ROOT)),
+]
 SVU_MODES = frozenset({"next", "major", "minor", "patch"})
 UPLOAD_GLOB: str | None = None
 
@@ -40,6 +45,17 @@ def write_manifest(version: str) -> None:
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     data["version"] = version
     MANIFEST.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    # npm lockfileVersion 2/3 keep the workspace package version at the top
+    # level and under packages[""]. Leaving them stale confuses npm ci / tooling
+    # after `./make_release prepare`.
+    if LOCKFILE.is_file():
+        lock = json.loads(LOCKFILE.read_text(encoding="utf-8"))
+        lock["version"] = version
+        packages = lock.get("packages")
+        if isinstance(packages, dict) and "" in packages and isinstance(packages[""], dict):
+            packages[""]["version"] = version
+        LOCKFILE.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
 
 
 def read_manifest_version() -> str:
