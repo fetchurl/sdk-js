@@ -461,6 +461,62 @@ describe('fetchurl()', () => {
       good.close();
     }
   });
+
+  it('rejects non-200 2xx statuses (not Response.ok)', async () => {
+    // Response.ok is true for 201/204/etc.; only 200 is a valid content body.
+    const content = new TextEncoder().encode('created body');
+    const hash = await sha256hex(content);
+    const created = await startServer((req, res) => {
+      res.writeHead(201);
+      res.end(content);
+    });
+    try {
+      await withEnv('', async () => {
+        await assert.rejects(
+          () =>
+            fetchurl({
+              fetch,
+              algo: 'sha256',
+              hash,
+              sourceUrls: [created.url],
+            }),
+          (err) =>
+            err instanceof AllSourcesFailedError &&
+            err.lastError instanceof FetchUrlError &&
+            /unexpected status 201/.test(err.lastError.message),
+        );
+      });
+    } finally {
+      created.close();
+    }
+  });
+
+  it('falls back when a non-200 2xx is followed by a 200 source', async () => {
+    const content = new TextEncoder().encode('only 200 counts');
+    const hash = await sha256hex(content);
+    const created = await startServer((req, res) => {
+      res.writeHead(201);
+      res.end(content);
+    });
+    const ok = await startServer((req, res) => {
+      res.writeHead(200);
+      res.end(content);
+    });
+    try {
+      await withEnv('', async () => {
+        const data = await fetchurl({
+          fetch,
+          algo: 'sha256',
+          hash,
+          sourceUrls: [created.url, ok.url],
+        });
+        assert.deepEqual(data, content);
+      });
+    } finally {
+      created.close();
+      ok.close();
+    }
+  });
 });
 
 /** Fake Response body that records cancel() calls. */

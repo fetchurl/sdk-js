@@ -464,7 +464,9 @@ export async function fetchurl({
       continue;
     }
 
-    if (!resp.ok) {
+    // Only HTTP 200 is a content response (parity with sdk-python / sdk-java /
+    // sdk-rust). Response.ok would also accept other 2xx (201, 204, …).
+    if (resp.status !== 200) {
       lastError = new FetchUrlError(`unexpected status ${resp.status}`);
       await cancelBody(resp.body);
       continue;
