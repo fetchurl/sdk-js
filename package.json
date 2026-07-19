@@ -3,9 +3,17 @@
   "version": "0.2.2",
   "description": "Protocol-level client SDK for fetchurl content-addressable cache servers",
   "type": "module",
-  "exports": "./fetchurl.js",
+  "types": "./fetchurl.d.ts",
+  "exports": {
+    ".": {
+      "types": "./fetchurl.d.ts",
+      "import": "./fetchurl.js",
+      "default": "./fetchurl.js"
+    }
+  },
   "files": [
     "fetchurl.js",
+    "fetchurl.d.ts",
     "README.md"
   ],
   "scripts": {
