@@ -17,6 +17,9 @@ MANIFEST_PATHS = [
     str(LOCKFILE.relative_to(ROOT)),
 ]
 SVU_MODES = frozenset({"next", "major", "minor", "patch"})
+# Explicit versions must be bare x.y.z (optional leading v stripped). Matches the
+# CLI rewrite that promotes a lone semver arg to `prepare <semver>`.
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 UPLOAD_GLOB: str | None = None
 
 
@@ -32,11 +35,22 @@ def run_out(cmd: list[str]) -> str:
     return run(cmd, capture=True).stdout.strip()
 
 
+def require_semver(version: str, *, what: str) -> str:
+    """Return *version* if it is x.y.z; otherwise exit with a clear error."""
+    version = version.lstrip("v")
+    if not SEMVER_RE.fullmatch(version):
+        raise SystemExit(
+            f"invalid {what} {version!r}; expected x.y.z "
+            f"(or svu mode: next|major|minor|patch)"
+        )
+    return version
+
+
 def resolve_version(mode: str) -> str:
     mode = mode.lstrip("v")
     if mode in SVU_MODES:
-        return run_out(["svu", mode]).lstrip("v")
-    return mode
+        return require_semver(run_out(["svu", mode]), what="svu version")
+    return require_semver(mode, what="version")
 
 
 def write_manifest(version: str) -> None:
@@ -195,7 +209,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "push":
-        version = (args.version or read_manifest_version()).lstrip("v")
+        version = require_semver(
+            args.version or read_manifest_version(),
+            what="version",
+        )
         push_release(version, upload_glob=UPLOAD_GLOB)
         print(version)
         return 0
