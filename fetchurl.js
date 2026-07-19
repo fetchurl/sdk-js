@@ -325,13 +325,26 @@ export class FetchSession {
 
   /**
    * @param {Object} options
-   * @param {string[]} options.servers - Cache server base URLs.
+   * @param {string[] | string} [options.servers] - Cache server base URLs, or a
+   *   FETCHURL_SERVER-format string (parsed via {@link parseFetchurlServer}).
+   *   A bare string must not be passed through `for…of` as an array of URLs —
+   *   that would iterate characters and build garbage attempt paths.
    * @param {string} options.algo - Hash algorithm name.
    * @param {string} options.hash - Expected hex hash.
    * @param {string[]} options.sourceUrls - Direct source URLs.
    */
   constructor({ servers, algo, hash, sourceUrls = [] }) {
-    if (!servers || servers.length === 0) {
+    if (typeof servers === 'string') {
+      servers = parseFetchurlServer(servers);
+    } else if (servers == null) {
+      servers = [];
+    } else if (!Array.isArray(servers)) {
+      throw new FetchUrlError(
+        'servers must be an array of base URLs or a FETCHURL_SERVER-format string',
+      );
+    }
+
+    if (servers.length === 0) {
       if (typeof process !== 'undefined' && process.env) {
         servers = parseFetchurlServer(process.env.FETCHURL_SERVER || '');
       } else {
@@ -437,7 +450,8 @@ export async function cancelBody(body) {
  *
  * @param {Object} options
  * @param {typeof globalThis.fetch} options.fetch - The fetch function (DI).
- * @param {string[]} [options.servers] - Cache server base URLs.
+ * @param {string[] | string} [options.servers] - Cache server base URLs, or a
+ *   FETCHURL_SERVER-format string (see {@link FetchSession}).
  * @param {string} options.algo - Hash algorithm (sha1, sha256, sha512).
  * @param {string} options.hash - Expected hex hash.
  * @param {string[]} [options.sourceUrls] - Direct source URLs.
