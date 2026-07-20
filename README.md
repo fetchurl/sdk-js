@@ -10,8 +10,6 @@ Uses the Web Crypto API — works in Node.js 19+, Deno, Bun, and browsers. Pass 
 npm install fetchurl-sdk
 ```
 
-(Package name on npm is `fetchurl-sdk`; publish separately when ready.)
-
 ## Protocol
 
 Normative behavior: **[fetchurl/spec](https://github.com/fetchurl/spec)** (`SPEC.md`).
